@@ -15,7 +15,6 @@ def generate_numbers(x):
 
     result = sorted(set(result))
 
-    # Фильтруем
     return [num for num in result if 1 <= num <= x]
 
 if __name__ == "__main__":
