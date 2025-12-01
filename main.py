@@ -1,12 +1,12 @@
 def check_brackets(s):
     stack = []
-    bracket_map = {')': '(', '}': '{', ']': '['}
+    brackets = {')': '(', '}': '{', ']': '['}
     
     for char in s:
         if char in "({[":
             stack.append(char)
         elif char in ")}]":
-            if not stack or stack[-1] != bracket_map[char]:
+            if not stack or stack[-1] != brackets[char]:
                 return False
             stack.pop()
     
