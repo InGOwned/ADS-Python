@@ -9,6 +9,87 @@ def check_brackets(expression):
             stack.pop()
     return len(stack) == 0
 
+
+def arithmetic_eval(expression):
+    """
+    Вычисляет арифметическое выражение, используя только базовые операции +, -, *, /, скобки.
+    Не использует eval() или другие встроенные функции.
+    """
+    i = 0
+
+    def parse_expression():
+        nonlocal i
+        result = parse_term()
+        while i < len(expression) and expression[i] in "+-":
+            op = expression[i]
+            i += 1
+            right = parse_term()
+            if op == '+':
+                result += right
+            elif op == '-':
+                result -= right
+        return result
+
+    def parse_term():
+        nonlocal i
+        result = parse_factor()
+        while i < len(expression) and expression[i] in "*/":
+            op = expression[i]
+            i += 1
+            right = parse_factor()
+            if op == '*':
+                result *= right
+            elif op == '/':
+                if right == 0:
+                    raise ZeroDivisionError
+                result /= right
+        return result
+
+    def parse_factor():
+        nonlocal i
+        if i < len(expression) and expression[i] == '-':
+            i += 1
+            return -parse_factor()
+        elif i < len(expression) and expression[i] == '+':
+            i += 1
+            return parse_factor()
+        elif expression[i].isdigit() or expression[i] == '.':
+            return parse_number()
+        elif expression[i] == '(':
+            i += 1
+            result = parse_expression()
+            if i < len(expression) and expression[i] == ')':
+                i += 1
+                return result
+            else:
+                raise ValueError("Несоответствие скобок")
+        else:
+            raise ValueError(f"Неожиданный символ: {expression[i]}")
+
+    def parse_number():
+        nonlocal i
+        start = i
+        if i < len(expression) and expression[i] == '.':
+            i += 1
+            if not expression[i].isdigit():
+                raise ValueError("Некорректное число")
+            while i < len(expression) and expression[i].isdigit():
+                i += 1
+            return float(expression[start:i])
+        else:
+            while i < len(expression) and (expression[i].isdigit() or expression[i] == '.'):
+                i += 1
+            return float(expression[start:i])
+
+    try:
+        value = parse_expression()
+        if i != len(expression):
+            raise ValueError("Лишние символы после выражения")
+        return value
+    except (ValueError, IndexError, ZeroDivisionError):
+        raise
+
+
 def evaluate_expression(expression):
     if not check_brackets(expression):
         return "Ошибка: Неправильное количество или расположение скобок."
@@ -36,12 +117,13 @@ def evaluate_expression(expression):
                 if num and float(num) == 0:
                     return "Ошибка: Деление на ноль."
 
-        result = eval(expression)
+        result = arithmetic_eval(temp_expr)
         return result
     except ZeroDivisionError:
         return "Ошибка: Деление на ноль."
     except Exception as e:
         return f"Ошибка в выражении: {e}"
+
 
 if __name__ == "__main__":
     expr = input().strip()
