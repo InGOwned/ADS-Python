@@ -20,7 +20,6 @@ def write_table_to_file(table, filename):
                 f.write(f'{index}: []\n')
 
 def main():
-    # Example data
     data = {
         "apple": 1,
         "banana": 2,

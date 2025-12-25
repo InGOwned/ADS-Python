@@ -4,7 +4,7 @@ def hash_function(key, table_size):
 def insert_with_collision(table, key, value):
     index = hash_function(key, len(table))
     while table[index] is not None:
-        index = (index + 1) % len(table)  # Linear probing
+        index = (index + 1) % len(table)
     table[index] = (key, value)
 
 def create_hash_table_with_collision(data, table_size):
@@ -22,7 +22,6 @@ def write_table_to_file(table, filename):
                 f.write(f'{index}: None\n')
 
 def main():
-    # Example data
     data = {
         "apple": 1,
         "banana": 2,
