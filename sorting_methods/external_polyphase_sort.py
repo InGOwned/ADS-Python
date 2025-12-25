@@ -1,6 +1,8 @@
 import heapq
 import os
 import tempfile
+import shutil
+
 
 def split_file_to_runs(input_file, run_size, temp_dir):
     """
@@ -9,7 +11,6 @@ def split_file_to_runs(input_file, run_size, temp_dir):
     runs = []
     with open(input_file, 'r') as f:
         while True:
-            # Читаем серию чисел
             run = []
             for _ in range(run_size):
                 line = f.readline()
@@ -23,9 +24,8 @@ def split_file_to_runs(input_file, run_size, temp_dir):
             if not run:
                 break
             
-            # Сортируем серию и записываем во временный файл
             run.sort()
-            run_file = tempfile.NamedTemporaryFile(mode='w+', dir=temp_dir, delete=False)
+            run_file = tempfile.NamedTemporaryFile(mode='w+', dir=temp_dir, delete=False, suffix='.tmp')
             for num in run:
                 run_file.write(f"{num}\n")
             run_file.close()
@@ -33,65 +33,78 @@ def split_file_to_runs(input_file, run_size, temp_dir):
     
     return runs
 
+
 def merge_runs(runs, output_file, temp_dir):
     """
     Слияние всех серий в один отсортированный файл с использованием многофазной сортировки.
     """
-    # Временные файлы для многофазного слияния
-    temp_files = [tempfile.NamedTemporaryFile(mode='w+', dir=temp_dir, delete=False) for _ in range(2)]
-    temp_paths = [f.name for f in temp_files]
+    # Временные файлы для промежуточных итераций
+    temp_files = [
+        os.path.join(temp_dir, f"temp_{i}.txt") 
+        for i in range(2)
+    ]
     
     current_runs = runs
     current_output = 0
     
     while len(current_runs) > 1:
-        # Сливаем серии
-        with open(temp_paths[current_output], 'w') as outfile:
-            # Открываем все файлы серий
+        with open(temp_files[current_output], 'w') as outfile:
             run_files = [open(run, 'r') for run in current_runs]
-            # Используем heapq для эффективного слияния
             heap = []
+            
             for i, file in enumerate(run_files):
                 line = file.readline()
                 if line:
-                    heapq.heappush(heap, (int(line.strip()), i))
+                    try:
+                        heapq.heappush(heap, (int(line.strip()), i))
+                    except ValueError:
+                        pass
             
             while heap:
                 val, file_idx = heapq.heappop(heap)
                 outfile.write(f"{val}\n")
                 
-                # Читаем следующее значение из соответствующего файла
                 next_line = run_files[file_idx].readline()
                 if next_line:
-                    heapq.heappush(heap, (int(next_line.strip()), file_idx))
+                    try:
+                        heapq.heappush(heap, (int(next_line.strip()), file_idx))
+                    except ValueError:
+                        pass
             
-            # Закрываем файлы серий
             for f in run_files:
                 f.close()
         
-        # Удаляем предыдущие временные файлы
+        # Удаляем исходные серии
         for run in current_runs:
-            os.unlink(run)
+            try:
+                os.unlink(run)
+            except:
+                pass
         
-        # Меняем текущий выходной файл
-        current_runs = [temp_paths[current_output]]
+        current_runs = [temp_files[current_output]]
         current_output = 1 - current_output
     
-    # Переименовываем финальный файл
+    # Копируем финальный результат вместо переименования (более надежно)
     if current_runs:
-        os.rename(current_runs[0], output_file)
+        try:
+            with open(current_runs[0], 'r') as src:
+                with open(output_file, 'w') as dst:
+                    dst.write(src.read())
+        except Exception as e:
+            print(f"Ошибка при копировании результата: {e}")
+            raise
     
-    # Удаляем временные файлы
+    # Удаляем оставшиеся временные файлы
     for temp_file in temp_files:
         try:
-            os.unlink(temp_file.name)
+            if os.path.exists(temp_file):
+                os.unlink(temp_file)
         except:
             pass
 
+
 def external_polyphase_sort(input_file, output_file, run_size=1000):
     """
-    Внешняя многофазная сортировка.
-    
     Параметры:
     input_file: путь к входному файлу с числами (по одному числу на строку)
     output_file: путь к выходному файлу
@@ -105,7 +118,6 @@ def external_polyphase_sort(input_file, output_file, run_size=1000):
         runs = split_file_to_runs(input_file, run_size, temp_dir)
         
         if not runs:
-            # Пустой входной файл
             with open(output_file, 'w') as f:
                 pass
             return
@@ -114,11 +126,12 @@ def external_polyphase_sort(input_file, output_file, run_size=1000):
         merge_runs(runs, output_file, temp_dir)
         
     finally:
-        # Очистка временной директории
+        # Удаляем всю временную директорию рекурсивно
         try:
-            os.rmdir(temp_dir)
-        except:
-            pass
+            shutil.rmtree(temp_dir)
+        except Exception as e:
+            print(f"Предупреждение: не удалось удалить временную папку: {e}")
+
 
 def create_test_file(filename, numbers):
     """Создает тестовый файл с числами"""
@@ -126,11 +139,12 @@ def create_test_file(filename, numbers):
         for num in numbers:
             f.write(f"{num}\n")
 
+
 if __name__ == "__main__":
     # Создаем тестовый файл
     test_input = "test_input.txt"
     test_output = "sorted_output.txt"
-    numbers = [64, 34, 25, 12, 22, 11, 90, 88, 76, 50, 42] * 100  # Большой массив для демонстрации
+    numbers = [64, 34, 25, 12, 22, 11, 90, 88, 76, 50, 42] * 100 
     create_test_file(test_input, numbers)
     
     print("Запуск внешней многофазной сортировки...")
@@ -146,19 +160,4 @@ if __name__ == "__main__":
     
     # Очищаем тестовые файлы
     os.unlink(test_input)
-    # os.unlink(test_output)  # Раскомментировать, если не хотите сохранять результат
-"""
-Этот алгоритм реализует внешнюю многофазную сортировку, которая используется
-для сортировки данных, которые не помещаются в оперативную память.
-
-Принцип работы:
-1. Разбиение входного файла на серии (runs) фиксированного размера
-2. Сортировка каждой серии в памяти и запись во временные файлы
-3. Постепенное слияние серий с использованием многофазного подхода
-
-Особенности:
-- Эффективно использует память
-- Минимизирует количество операций ввода-вывода
-- Подходит для очень больших объемов данных
-- Использует кучу (heap) для эффективного слияния
-"""
+    # os.unlink(test_output)
