@@ -10,91 +10,80 @@ def check_brackets(expression):
     return len(stack) == 0
 
 
-def manual_calculate(expression):
-    """
-    Вручную вычисляет выражение без использования eval().
-    """
-    # Убираем пробелы
+def arithmetic_eval(expression):
     i = 0
-    cleaned = ""
-    while i < len(expression):
-        if expression[i] != ' ':
-            cleaned += expression[i]
-        i += 1
-    
-    expression = cleaned
-    
-    # Парсим и вычисляем с учетом приоритета операций
-    def parse_expression(expr):
-        # Сначала обрабатываем скобки
-        while '(' in expr:
-            start = -1
-            for i in range(len(expr)):
-                if expr[i] == '(':
-                    start = i
-                elif expr[i] == ')':
-                    inner = expr[start+1:i]
-                    result = parse_expression(inner)
-                    expr = expr[:start] + str(result) + expr[i+1:]
-                    break
-        
-        while '*' in expr or '/' in expr:
-            for i in range(len(expr)):
-                if expr[i] == '*' or expr[i] == '/':
-                    # Левый операнд
-                    left_end = i - 1
-                    while left_end >= 0 and (expr[left_end].isdigit() or expr[left_end] == '.'):
-                        left_end -= 1
-                    left_start = left_end + 1
-                    left_num = float(expr[left_start:i])
-                    
-                    # Правый операнд
-                    right_start = i + 1
-                    right_end = right_start
-                    while right_end < len(expr) and (expr[right_end].isdigit() or expr[right_end] == '.'):
-                        right_end += 1
-                    right_num = float(expr[right_start:right_end])
-                    
-                    # Выполняем операцию
-                    if expr[i] == '*':
-                        result = left_num * right_num
-                    else:
-                        if right_num == 0:
-                            raise ZeroDivisionError("division by zero")
-                        result = left_num / right_num
-                    
-                    expr = expr[:left_start] + str(result) + expr[right_end:]
-                    break
-        
-        while '+' in expr or '-' in expr:
-            for i in range(1, len(expr)):
-                if expr[i] == '+' or expr[i] == '-':
-                    # Левый операнд
-                    left_end = i - 1
-                    while left_end >= 0 and (expr[left_end].isdigit() or expr[left_end] == '.'):
-                        left_end -= 1
-                    left_start = left_end + 1
-                    left_num = float(expr[left_start:i])
-                    
-                    # Правый операнд
-                    right_start = i + 1
-                    right_end = right_start
-                    while right_end < len(expr) and (expr[right_end].isdigit() or expr[right_end] == '.'):
-                        right_end += 1
-                    right_num = float(expr[right_start:right_end])
-                    
-                    # Выполняем операцию
-                    if expr[i] == '+':
-                        result = left_num + right_num
-                    else:
-                        result = left_num - right_num
-                    
-                    expr = expr[:left_start] + str(result) + expr[right_end:]
-                    break
-        
-        return float(expr)
-    
-    return parse_expression(expression)
+
+    def parse_expression():
+        nonlocal i
+        result = parse_term()
+        while i < len(expression) and expression[i] in "+-":
+            op = expression[i]
+            i += 1
+            right = parse_term()
+            if op == '+':
+                result += right
+            elif op == '-':
+                result -= right
+        return result
+
+    def parse_term():
+        nonlocal i
+        result = parse_factor()
+        while i < len(expression) and expression[i] in "*/":
+            op = expression[i]
+            i += 1
+            right = parse_factor()
+            if op == '*':
+                result *= right
+            elif op == '/':
+                if right == 0:
+                    raise ZeroDivisionError
+                result /= right
+        return result
+
+    def parse_factor():
+        nonlocal i
+        if i < len(expression) and expression[i] == '-':
+            i += 1
+            return -parse_factor()
+        elif i < len(expression) and expression[i] == '+':
+            i += 1
+            return parse_factor()
+        elif expression[i].isdigit() or expression[i] == '.':
+            return parse_number()
+        elif expression[i] == '(':
+            i += 1
+            result = parse_expression()
+            if i < len(expression) and expression[i] == ')':
+                i += 1
+                return result
+            else:
+                raise ValueError("Несоответствие скобок")
+        else:
+            raise ValueError(f"Неожиданный символ: {expression[i]}")
+
+    def parse_number():
+        nonlocal i
+        start = i
+        if i < len(expression) and expression[i] == '.':
+            i += 1
+            if not expression[i].isdigit():
+                raise ValueError("Некорректное число")
+            while i < len(expression) and expression[i].isdigit():
+                i += 1
+            return float(expression[start:i])
+        else:
+            while i < len(expression) and (expression[i].isdigit() or expression[i] == '.'):
+                i += 1
+            return float(expression[start:i])
+
+    try:
+        value = parse_expression()
+        if i != len(expression):
+            raise ValueError("Лишние символы после выражения")
+        return value
+    except (ValueError, IndexError, ZeroDivisionError):
+        raise
 
 
 def evaluate_expression(expression):
@@ -107,7 +96,24 @@ def evaluate_expression(expression):
         return "Ошибка: Выражение должно заканчиваться знаком '='."
 
     try:
-        result = manual_calculate(expression)
+        temp_expr = expression.replace('=', '')
+        parts = temp_expr.split('/')
+        for i in range(1, len(parts)):
+            part = parts[i].strip()
+            if part.startswith('0'):
+                if len(part) == 1 or not part[1].isdigit():
+                    return "Ошибка: Деление на ноль."
+            elif part[0].isdigit() and part.split()[0][0] == '0':
+                num = ""
+                for c in part:
+                    if c.isdigit() or c == '.':
+                        num += c
+                    else:
+                        break
+                if num and float(num) == 0:
+                    return "Ошибка: Деление на ноль."
+
+        result = arithmetic_eval(temp_expr)
         return result
     except ZeroDivisionError:
         return "Ошибка: Деление на ноль."
